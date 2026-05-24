@@ -8,13 +8,14 @@ steps:
     edit: true
     instruction: implement
     session: refresh
-    required_permission_mode: edit
+    required_permission_mode: full
     rules:
       - when: "true"
         next: create-pr
 
   - name: create-pr
     edit: false
+    required_permission_mode: full
     instruction: |
       現在のブランチの変更内容をもとに GitHub Pull Request を作成してください。
 
