@@ -21,6 +21,7 @@ var (
 const (
 	focusPersona = iota
 	focusPolicy
+	focusInstruction
 	focusOutputContract
 	focusCount
 )
@@ -28,12 +29,14 @@ const (
 var fieldLabels = [focusCount]string{
 	"Persona",
 	"Policy",
+	"Instruction",
 	"Output Contract",
 }
 
 type FormData struct {
 	Persona        string
 	Policy         string
+	Instruction    string
 	OutputContract string
 }
 
@@ -59,6 +62,7 @@ func newFormModel(data FormData) formModel {
 		areas: [focusCount]textarea.Model{
 			makeArea(data.Persona),
 			makeArea(data.Policy),
+			makeArea(data.Instruction),
 			makeArea(data.OutputContract),
 		},
 	}
@@ -150,6 +154,7 @@ func (m formModel) Data() FormData {
 	return FormData{
 		Persona:        strings.TrimSpace(m.areas[focusPersona].Value()),
 		Policy:         strings.TrimSpace(m.areas[focusPolicy].Value()),
+		Instruction:    strings.TrimSpace(m.areas[focusInstruction].Value()),
 		OutputContract: strings.TrimSpace(m.areas[focusOutputContract].Value()),
 	}
 }
