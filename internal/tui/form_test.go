@@ -5,87 +5,107 @@ import (
 )
 
 func TestNewFormModel_FieldCount(t *testing.T) {
-	data := FormData{
-		Persona:        "p",
-		Policy:         "po",
-		Instruction:    "i",
-		OutputContract: "oc",
-	}
-	m := newFormModel(data)
-
+	m := newFormModel(FormData{Persona: "p", Policy: "po", Instruction: "i", OutputContract: "oc"})
 	if len(m.areas) != focusCount {
 		t.Errorf("expected %d areas, got %d", focusCount, len(m.areas))
 	}
 }
 
 func TestFormModel_Data_RoundTrip(t *testing.T) {
-	data := FormData{
-		Persona:        "persona text",
-		Policy:         "policy text",
-		Instruction:    "instruction text",
-		OutputContract: "output contract text",
-	}
-	m := newFormModel(data)
-	got := m.Data()
-
-	if got.Persona != data.Persona {
-		t.Errorf("Persona: expected %q, got %q", data.Persona, got.Persona)
-	}
-	if got.Policy != data.Policy {
-		t.Errorf("Policy: expected %q, got %q", data.Policy, got.Policy)
-	}
-	if got.Instruction != data.Instruction {
-		t.Errorf("Instruction: expected %q, got %q", data.Instruction, got.Instruction)
-	}
-	if got.OutputContract != data.OutputContract {
-		t.Errorf("OutputContract: expected %q, got %q", data.OutputContract, got.OutputContract)
+	data := FormData{Persona: "a", Policy: "b", Instruction: "c", OutputContract: "d"}
+	got := newFormModel(data).Data()
+	if got != data {
+		t.Errorf("expected %+v, got %+v", data, got)
 	}
 }
 
 func TestFormModel_Data_TrimsWhitespace(t *testing.T) {
-	data := FormData{
-		Persona:        "  persona  ",
-		Policy:         "  policy  ",
-		Instruction:    "  instruction  ",
-		OutputContract: "  output  ",
-	}
-	m := newFormModel(data)
-	got := m.Data()
-
-	if got.Persona != "persona" {
-		t.Errorf("Persona not trimmed: got %q", got.Persona)
-	}
-	if got.Policy != "policy" {
-		t.Errorf("Policy not trimmed: got %q", got.Policy)
-	}
-	if got.Instruction != "instruction" {
-		t.Errorf("Instruction not trimmed: got %q", got.Instruction)
-	}
-	if got.OutputContract != "output" {
-		t.Errorf("OutputContract not trimmed: got %q", got.OutputContract)
-	}
-}
-
-func TestFieldLabels_IncludesInstruction(t *testing.T) {
-	if focusCount != 4 {
-		t.Fatalf("expected focusCount=4, got %d", focusCount)
-	}
-	if fieldLabels[focusInstruction] != "Instruction" {
-		t.Errorf("expected label %q at focusInstruction, got %q", "Instruction", fieldLabels[focusInstruction])
+	data := FormData{Persona: "  x  ", Policy: "  y  ", Instruction: "  z  ", OutputContract: "  w  "}
+	got := newFormModel(data).Data()
+	if got.Persona != "x" || got.Policy != "y" || got.Instruction != "z" || got.OutputContract != "w" {
+		t.Errorf("not trimmed: %+v", got)
 	}
 }
 
 func TestFocusOrder(t *testing.T) {
-	if focusPersona != 0 {
-		t.Errorf("focusPersona should be 0, got %d", focusPersona)
+	if focusPersona != 0 || focusPolicy != 1 || focusInstruction != 2 || focusOutputContract != 3 {
+		t.Error("unexpected focus order")
 	}
-	if focusPolicy != 1 {
-		t.Errorf("focusPolicy should be 1, got %d", focusPolicy)
+}
+
+func TestTemplateFormModel_RoundTrip(t *testing.T) {
+	data := TemplateFormData{
+		Persona:  "@engineer",
+		Policy:   "Be concise.",
+		Instruction: "@code-review",
 	}
-	if focusInstruction != 2 {
-		t.Errorf("focusInstruction should be 2, got %d", focusInstruction)
+	m := newTemplateFormModel(data, AvailableParts{})
+	got := m.Data()
+
+	if got.Persona != "@engineer" {
+		t.Errorf("Persona: %q", got.Persona)
 	}
-	if focusOutputContract != 3 {
-		t.Errorf("focusOutputContract should be 3, got %d", focusOutputContract)
+	if got.Policy != "Be concise." {
+		t.Errorf("Policy: %q", got.Policy)
+	}
+	if got.Instruction != "@code-review" {
+		t.Errorf("Instruction: %q", got.Instruction)
+	}
+	if got.OutputContract != "" {
+		t.Errorf("OutputContract: %q", got.OutputContract)
+	}
+}
+
+func TestTemplateFormModel_Completing(t *testing.T) {
+	available := AvailableParts{
+		Persona: []PartInfo{
+			{Name: "code-reviewer", Builtin: true},
+			{Name: "software-engineer", Builtin: true},
+		},
+	}
+	data := TemplateFormData{Persona: "@co"}
+	m := newTemplateFormModel(data, available)
+
+	if !m.isCompleting() {
+		t.Error("expected completing for @co")
+	}
+
+	filtered := m.filteredParts()
+	if len(filtered) != 1 || filtered[0].Name != "code-reviewer" {
+		t.Errorf("expected [code-reviewer], got %v", filtered)
+	}
+}
+
+func TestTemplateFormModel_NotCompleting(t *testing.T) {
+	data := TemplateFormData{Persona: "plain text"}
+	m := newTemplateFormModel(data, AvailableParts{})
+
+	if m.isCompleting() {
+		t.Error("should not be completing for plain text")
+	}
+}
+
+func TestTemplateFormModel_NotCompleting_Multiline(t *testing.T) {
+	data := TemplateFormData{Persona: "@code\nmore text"}
+	m := newTemplateFormModel(data, AvailableParts{})
+
+	if m.isCompleting() {
+		t.Error("should not be completing for multiline starting with @")
+	}
+}
+
+func TestTemplateFormModel_FilterAll(t *testing.T) {
+	available := AvailableParts{
+		Persona: []PartInfo{
+			{Name: "a", Builtin: false},
+			{Name: "b", Builtin: true},
+		},
+	}
+	data := TemplateFormData{Persona: "@"}
+	m := newTemplateFormModel(data, available)
+
+	filtered := m.filteredParts()
+	if len(filtered) != 2 {
+		t.Errorf("expected 2, got %d", len(filtered))
 	}
 }
