@@ -133,42 +133,6 @@ func validateTemplate(tmpl Template) error {
 	return check("output-contract", tmpl.OutputContract)
 }
 
-func parseFacetArgs(args []string) (map[string]string, error) {
-	result := make(map[string]string)
-	for _, arg := range args {
-		kv := strings.SplitN(arg, "=", 2)
-		if len(kv) != 2 {
-			return nil, fmt.Errorf("invalid argument %q (expected facet=value)", arg)
-		}
-		if !isValidFacet(kv[0]) {
-			return nil, fmt.Errorf("unknown facet %q (valid: %s)", kv[0], strings.Join(validFacets, ", "))
-		}
-		result[kv[0]] = kv[1]
-	}
-	return result, nil
-}
-
-func applyFacetArgs(tmpl *Template, args map[string]string) {
-	set := func(field *string, value string) {
-		if !strings.HasPrefix(value, "@") {
-			value = "@" + value
-		}
-		*field = value
-	}
-	if v, ok := args["persona"]; ok {
-		set(&tmpl.Persona, v)
-	}
-	if v, ok := args["policy"]; ok {
-		set(&tmpl.Policy, v)
-	}
-	if v, ok := args["instruction"]; ok {
-		set(&tmpl.Instruction, v)
-	}
-	if v, ok := args["output-contract"]; ok {
-		set(&tmpl.OutputContract, v)
-	}
-}
-
 // --- Part commands ---
 
 func cmdPartAdd(facet, name string) error {
@@ -328,26 +292,17 @@ func formDataToTemplate(data tui.TemplateFormData) Template {
 	}
 }
 
-func cmdInit(name string, args []string) error {
+func cmdInit(name string) error {
 	dir := filepath.Join(templateDir(), name)
 	if _, err := os.Stat(dir); err == nil {
 		return fmt.Errorf("template %q already exists", name)
 	}
 
-	var tmpl Template
-	if args == nil {
-		result, err := tui.RunTemplateForm(tui.TemplateFormData{}, collectAvailableParts())
-		if err != nil {
-			return err
-		}
-		tmpl = formDataToTemplate(result)
-	} else if len(args) > 0 {
-		parsed, err := parseFacetArgs(args)
-		if err != nil {
-			return err
-		}
-		applyFacetArgs(&tmpl, parsed)
+	result, err := tui.RunTemplateForm(tui.TemplateFormData{}, collectAvailableParts())
+	if err != nil {
+		return err
 	}
+	tmpl := formDataToTemplate(result)
 
 	if err := validateTemplate(tmpl); err != nil {
 		return err
@@ -359,25 +314,17 @@ func cmdInit(name string, args []string) error {
 	return nil
 }
 
-func cmdEdit(name string, args []string) error {
+func cmdEdit(name string) error {
 	tmpl, err := loadTemplate(name)
 	if err != nil {
 		return err
 	}
 
-	if args == nil {
-		result, err := tui.RunTemplateForm(templateToFormData(tmpl), collectAvailableParts())
-		if err != nil {
-			return err
-		}
-		tmpl = formDataToTemplate(result)
-	} else if len(args) > 0 {
-		parsed, err := parseFacetArgs(args)
-		if err != nil {
-			return err
-		}
-		applyFacetArgs(&tmpl, parsed)
+	result, err := tui.RunTemplateForm(templateToFormData(tmpl), collectAvailableParts())
+	if err != nil {
+		return err
 	}
+	tmpl = formDataToTemplate(result)
 
 	if err := validateTemplate(tmpl); err != nil {
 		return err
@@ -389,22 +336,10 @@ func cmdEdit(name string, args []string) error {
 	return nil
 }
 
-func cmdRun(name string, overrides []string) error {
+func cmdRun(name string) error {
 	tmpl, err := loadTemplate(name)
 	if err != nil {
 		return err
-	}
-
-	overrideMap := make(map[string]string)
-	for _, arg := range overrides {
-		kv := strings.SplitN(arg, "=", 2)
-		if len(kv) != 2 {
-			return fmt.Errorf("invalid override %q (expected facet=text)", arg)
-		}
-		if !isValidFacet(kv[0]) {
-			return fmt.Errorf("unknown facet %q (valid: %s)", kv[0], strings.Join(validFacets, ", "))
-		}
-		overrideMap[kv[0]] = kv[1]
 	}
 
 	type facetDef struct {
@@ -417,12 +352,6 @@ func cmdRun(name string, overrides []string) error {
 		{tmpl.Policy, "policy", "policy"},
 		{tmpl.Instruction, "instruction", "instruction"},
 		{tmpl.OutputContract, "output-contract", "output-contract"},
-	}
-
-	for i, d := range defs {
-		if text, ok := overrideMap[d.facet]; ok {
-			defs[i].value = text
-		}
 	}
 
 	var sections []string
@@ -472,20 +401,18 @@ func cmdDelete(name string) error {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `Usage:
-  prompt-cli init <name> [facet=part ...]   Create a new template
-  prompt-cli edit <name> [facet=part ...]   Edit a template
-  prompt-cli run <name> [facet=text ...]    Run a template (with optional overrides)
-  prompt-cli list                           List all templates
-  prompt-cli delete <name>                  Delete a template
+  prompt-cli init <name>              Create a new template
+  prompt-cli edit <name>              Edit a template
+  prompt-cli run <name>               Run a template
+  prompt-cli list                     List all templates
+  prompt-cli delete <name>            Delete a template
 
   prompt-cli part add <facet> <name>        Create a reusable part
   prompt-cli part edit <facet> <name>       Edit a part
   prompt-cli part list [facet]              List parts
   prompt-cli part delete <facet> <name>     Delete a part
 
-Facets: persona, policy, instruction, output-contract
-
-Values: @part-name for part reference, plain text for inline content`)
+Facets: persona, policy, instruction, output-contract`)
 }
 
 func main() {
@@ -498,30 +425,22 @@ func main() {
 	switch os.Args[1] {
 	case "init":
 		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "Usage: prompt-cli init <name> [facet=part ...]")
+			fmt.Fprintln(os.Stderr, "Usage: prompt-cli init <name>")
 			os.Exit(1)
 		}
-		var initArgs []string
-		if len(os.Args) > 3 {
-			initArgs = os.Args[3:]
-		}
-		err = cmdInit(os.Args[2], initArgs)
+		err = cmdInit(os.Args[2])
 	case "edit":
 		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "Usage: prompt-cli edit <name> [facet=part ...]")
+			fmt.Fprintln(os.Stderr, "Usage: prompt-cli edit <name>")
 			os.Exit(1)
 		}
-		var editArgs []string
-		if len(os.Args) > 3 {
-			editArgs = os.Args[3:]
-		}
-		err = cmdEdit(os.Args[2], editArgs)
+		err = cmdEdit(os.Args[2])
 	case "run":
 		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "Usage: prompt-cli run <name> [facet=text ...]")
+			fmt.Fprintln(os.Stderr, "Usage: prompt-cli run <name>")
 			os.Exit(1)
 		}
-		err = cmdRun(os.Args[2], os.Args[3:])
+		err = cmdRun(os.Args[2])
 	case "delete":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "Usage: prompt-cli delete <name>")
