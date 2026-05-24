@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +26,7 @@ func cmdInit(name string) error {
 	files := map[string]string{
 		"persona.md":         "",
 		"policy.md":          "",
+		"instruction.md":     "",
 		"output-contract.md": "",
 	}
 	for filename, content := range files {
@@ -38,21 +38,10 @@ func cmdInit(name string) error {
 	return cmdEdit(name)
 }
 
-func cmdRun(name string, instruction string) error {
+func cmdRun(name string) error {
 	dir := filepath.Join(templateDir(), name)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return fmt.Errorf("template %q not found", name)
-	}
-
-	if instruction == "" {
-		b, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return fmt.Errorf("reading stdin: %w", err)
-		}
-		instruction = strings.TrimSpace(string(b))
-	}
-	if instruction == "" {
-		return fmt.Errorf("instruction is required (as argument or via stdin)")
 	}
 
 	type facet struct {
@@ -62,6 +51,8 @@ func cmdRun(name string, instruction string) error {
 	facets := []facet{
 		{"persona.md", "persona"},
 		{"policy.md", "policy"},
+		{"instruction.md", "instruction"},
+		{"output-contract.md", "output-contract"},
 	}
 
 	var parts []string
@@ -72,15 +63,6 @@ func cmdRun(name string, instruction string) error {
 		}
 		if s := strings.TrimSpace(string(content)); s != "" {
 			parts = append(parts, fmt.Sprintf("<%s>\n%s\n</%s>", f.tag, s, f.tag))
-		}
-	}
-
-	parts = append(parts, fmt.Sprintf("<instruction>\n%s\n</instruction>", instruction))
-
-	content, err := os.ReadFile(filepath.Join(dir, "output-contract.md"))
-	if err == nil {
-		if s := strings.TrimSpace(string(content)); s != "" {
-			parts = append(parts, fmt.Sprintf("<output-contract>\n%s\n</output-contract>", s))
 		}
 	}
 
@@ -123,6 +105,7 @@ func cmdEdit(name string) error {
 	data := tui.FormData{
 		Persona:        readFacet(dir, "persona.md"),
 		Policy:         readFacet(dir, "policy.md"),
+		Instruction:    readFacet(dir, "instruction.md"),
 		OutputContract: readFacet(dir, "output-contract.md"),
 	}
 
@@ -134,6 +117,7 @@ func cmdEdit(name string) error {
 	files := map[string]string{
 		"persona.md":         result.Persona,
 		"policy.md":          result.Policy,
+		"instruction.md":     result.Instruction,
 		"output-contract.md": result.OutputContract,
 	}
 	for filename, content := range files {
@@ -159,11 +143,11 @@ func cmdDelete(name string) error {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `Usage:
-  prompt-cli init <name>              Create a new template
-  prompt-cli edit <name>              Edit a template
-  prompt-cli run <name> [instruction] Run a template with instruction
-  prompt-cli list                     List all templates
-  prompt-cli delete <name>            Delete a template`)
+  prompt-cli init <name>    Create a new template
+  prompt-cli edit <name>    Edit a template
+  prompt-cli run <name>     Run a template
+  prompt-cli list           List all templates
+  prompt-cli delete <name>  Delete a template`)
 }
 
 func main() {
@@ -188,14 +172,10 @@ func main() {
 		err = cmdEdit(os.Args[2])
 	case "run":
 		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "Usage: prompt-cli run <name> [instruction]")
+			fmt.Fprintln(os.Stderr, "Usage: prompt-cli run <name>")
 			os.Exit(1)
 		}
-		instruction := ""
-		if len(os.Args) >= 4 {
-			instruction = strings.Join(os.Args[3:], " ")
-		}
-		err = cmdRun(os.Args[2], instruction)
+		err = cmdRun(os.Args[2])
 	case "delete":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "Usage: prompt-cli delete <name>")
