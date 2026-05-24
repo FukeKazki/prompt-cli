@@ -34,7 +34,7 @@ prompt-cli init <name>
 prompt-cli edit <name>
 ```
 
-TUIエディタでPersona・Policy・Output Contractを編集する。
+TUIエディタでPersona・Policy・Instruction・Output Contractを編集する。
 
 | キー | 操作 |
 |------|------|
@@ -45,16 +45,10 @@ TUIエディタでPersona・Policy・Output Contractを編集する。
 ### テンプレートの実行
 
 ```bash
-prompt-cli run <name> "指示内容"
+prompt-cli run <name>
 ```
 
 各ファセットをXMLタグで結合したプロンプトを標準出力に出力する。
-
-標準入力からの指示も受け付ける:
-
-```bash
-echo "コードをレビューしてください" | prompt-cli run code-reviewer
-```
 
 ### テンプレートの一覧
 
@@ -71,7 +65,7 @@ prompt-cli delete <name>
 ## 出力例
 
 ```bash
-prompt-cli run code-reviewer "このPRをレビューしてください"
+prompt-cli run code-reviewer
 ```
 
 ```xml
@@ -84,7 +78,7 @@ prompt-cli run code-reviewer "このPRをレビューしてください"
 </policy>
 
 <instruction>
-このPRをレビューしてください
+コードの品質・可読性・保守性を確認してください。
 </instruction>
 
 <output-contract>
