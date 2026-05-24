@@ -46,9 +46,6 @@ prompt-cli part delete persona my-engineer
 ```bash
 # TUIで対話的に作成
 prompt-cli init my-template
-
-# パーツを指定して作成
-prompt-cli init review persona=code-reviewer policy=japanese output-contract=markdown
 ```
 
 ### テンプレートの編集
@@ -56,9 +53,6 @@ prompt-cli init review persona=code-reviewer policy=japanese output-contract=mar
 ```bash
 # TUIで対話的に編集
 prompt-cli edit review
-
-# ファセットを直接更新
-prompt-cli edit review persona=software-engineer
 ```
 
 TUIでは各ファセットにテキストエリアが表示される。`@` を入力するとパーツ補完が起動し、絞り込み・選択できる。`@` なしで直接テキストを入力するとインラインとして保存される。
@@ -83,17 +77,8 @@ output-contract: '@markdown'
 ### テンプレートの実行
 
 ```bash
-# テンプレートをそのまま実行
 prompt-cli run review
-
-# ファセットをインラインテキストで上書き
-prompt-cli run review instruction="このPRのセキュリティリスクを重点的にレビューしてください"
-
-# パーツ参照で上書き
-prompt-cli run review persona=@software-engineer
 ```
-
-`@name` はパーツとして解決され、それ以外のテキストはそのまま使われる。
 
 ### テンプレートの一覧・削除
 
@@ -123,8 +108,9 @@ prompt-cli delete <name>
 ## 出力例
 
 ```bash
-prompt-cli init review persona=code-reviewer policy=japanese output-contract=markdown
-prompt-cli run review instruction="このPRのセキュリティリスクを重点的にレビューしてください"
+prompt-cli init review
+# TUIで persona=@code-reviewer, policy=@japanese, output-contract=@markdown を設定
+prompt-cli run review
 ```
 
 ```xml

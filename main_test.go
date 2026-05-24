@@ -51,60 +51,13 @@ func captureStdout(t *testing.T, fn func() error) (string, error) {
 
 // --- init ---
 
-func TestCmdInit_WithParts(t *testing.T) {
-	home := setupTestEnv(t)
-	createPart(t, home, "persona", "engineer", "You are an engineer.")
-
-	if err := cmdInit("my-tmpl", []string{"persona=engineer"}); err != nil {
-		t.Fatal(err)
-	}
-
-	tmpl, err := loadTemplate("my-tmpl")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if tmpl.Persona != "@engineer" {
-		t.Errorf("expected @engineer, got %q", tmpl.Persona)
-	}
-}
-
-func TestCmdInit_EmptyTemplate(t *testing.T) {
-	home := setupTestEnv(t)
-	if err := cmdInit("empty", []string{}); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(home, ".prompt-cli", "templates", "empty", "template.yaml")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Error("expected template.yaml to exist")
-	}
-}
-
 func TestCmdInit_AlreadyExists(t *testing.T) {
 	home := setupTestEnv(t)
 	createTemplate(t, home, "existing", "persona: '@x'\n")
 
-	err := cmdInit("existing", nil)
+	err := cmdInit("existing")
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Errorf("expected 'already exists' error, got: %v", err)
-	}
-}
-
-func TestCmdInit_InvalidPart(t *testing.T) {
-	setupTestEnv(t)
-	err := cmdInit("bad", []string{"persona=nonexistent"})
-	if err == nil || !strings.Contains(err.Error(), "not found") {
-		t.Errorf("expected 'not found' error, got: %v", err)
-	}
-}
-
-func TestCmdInit_WithBuiltinPart(t *testing.T) {
-	setupTestEnv(t)
-	if err := cmdInit("b", []string{"persona=code-reviewer"}); err != nil {
-		t.Fatal(err)
-	}
-	tmpl, _ := loadTemplate("b")
-	if tmpl.Persona != "@code-reviewer" {
-		t.Errorf("expected @code-reviewer, got %q", tmpl.Persona)
 	}
 }
 
@@ -115,7 +68,7 @@ func TestCmdRun_PartRef(t *testing.T) {
 	createPart(t, home, "persona", "helper", "You are helpful.")
 	createTemplate(t, home, "t", "persona: '@helper'\n")
 
-	out, err := captureStdout(t, func() error { return cmdRun("t", nil) })
+	out, err := captureStdout(t, func() error { return cmdRun("t") })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +81,7 @@ func TestCmdRun_InlineText(t *testing.T) {
 	home := setupTestEnv(t)
 	createTemplate(t, home, "t", "persona: Custom bot\n")
 
-	out, err := captureStdout(t, func() error { return cmdRun("t", nil) })
+	out, err := captureStdout(t, func() error { return cmdRun("t") })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +99,7 @@ instruction: '@summarize'
 output-contract: Output markdown.
 `)
 
-	out, err := captureStdout(t, func() error { return cmdRun("t", nil) })
+	out, err := captureStdout(t, func() error { return cmdRun("t") })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +116,7 @@ func TestCmdRun_SkipsEmpty(t *testing.T) {
 	createPart(t, home, "persona", "bot", "Bot.")
 	createTemplate(t, home, "t", "persona: '@bot'\n")
 
-	out, err := captureStdout(t, func() error { return cmdRun("t", nil) })
+	out, err := captureStdout(t, func() error { return cmdRun("t") })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +132,7 @@ func TestCmdRun_MissingPart(t *testing.T) {
 	home := setupTestEnv(t)
 	createTemplate(t, home, "t", "persona: '@nonexistent'\n")
 
-	err := cmdRun("t", nil)
+	err := cmdRun("t")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected 'not found', got: %v", err)
 	}
@@ -187,71 +140,9 @@ func TestCmdRun_MissingPart(t *testing.T) {
 
 func TestCmdRun_TemplateNotFound(t *testing.T) {
 	setupTestEnv(t)
-	err := cmdRun("nope", nil)
+	err := cmdRun("nope")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected 'not found', got: %v", err)
-	}
-}
-
-func TestCmdRun_Override(t *testing.T) {
-	home := setupTestEnv(t)
-	createPart(t, home, "persona", "helper", "Helper.")
-	createTemplate(t, home, "t", "persona: '@helper'\n")
-
-	out, err := captureStdout(t, func() error {
-		return cmdRun("t", []string{"instruction=Do something"})
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "<persona>\nHelper.\n</persona>") {
-		t.Error("expected persona from template")
-	}
-	if !strings.Contains(out, "<instruction>\nDo something\n</instruction>") {
-		t.Error("expected instruction from override")
-	}
-}
-
-func TestCmdRun_OverrideReplaces(t *testing.T) {
-	home := setupTestEnv(t)
-	createPart(t, home, "persona", "helper", "Helper.")
-	createTemplate(t, home, "t", "persona: '@helper'\n")
-
-	out, err := captureStdout(t, func() error {
-		return cmdRun("t", []string{"persona=Custom"})
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "Custom") {
-		t.Error("expected override content")
-	}
-	if strings.Contains(out, "Helper.") {
-		t.Error("expected original to be replaced")
-	}
-}
-
-func TestCmdRun_OverrideWithPartRef(t *testing.T) {
-	home := setupTestEnv(t)
-	createTemplate(t, home, "t", "persona: '@code-reviewer'\n")
-
-	out, err := captureStdout(t, func() error {
-		return cmdRun("t", []string{"persona=@software-engineer"})
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "シニアソフトウェアエンジニア") {
-		t.Errorf("expected software-engineer content, got:\n%s", out)
-	}
-}
-
-func TestCmdRun_OverrideInvalidFacet(t *testing.T) {
-	home := setupTestEnv(t)
-	createTemplate(t, home, "t", "")
-	err := cmdRun("t", []string{"unknown=value"})
-	if err == nil || !strings.Contains(err.Error(), "unknown facet") {
-		t.Errorf("expected 'unknown facet', got: %v", err)
 	}
 }
 
@@ -259,28 +150,12 @@ func TestCmdRun_WithBuiltinParts(t *testing.T) {
 	home := setupTestEnv(t)
 	createTemplate(t, home, "t", "persona: '@software-engineer'\npolicy: '@concise'\n")
 
-	out, err := captureStdout(t, func() error { return cmdRun("t", nil) })
+	out, err := captureStdout(t, func() error { return cmdRun("t") })
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, "<persona>") || !strings.Contains(out, "<policy>") {
 		t.Errorf("expected builtin content:\n%s", out)
-	}
-}
-
-// --- edit ---
-
-func TestCmdEdit_UpdatesFacet(t *testing.T) {
-	home := setupTestEnv(t)
-	createPart(t, home, "persona", "new", "New.")
-	createTemplate(t, home, "t", "persona: '@code-reviewer'\n")
-
-	if err := cmdEdit("t", []string{"persona=new"}); err != nil {
-		t.Fatal(err)
-	}
-	tmpl, _ := loadTemplate("t")
-	if tmpl.Persona != "@new" {
-		t.Errorf("expected @new, got %q", tmpl.Persona)
 	}
 }
 
@@ -409,35 +284,3 @@ func TestIsValidFacet(t *testing.T) {
 	}
 }
 
-func TestParseFacetArgs(t *testing.T) {
-	m, err := parseFacetArgs([]string{"persona=x", "policy=y"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if m["persona"] != "x" || m["policy"] != "y" {
-		t.Errorf("got %v", m)
-	}
-
-	_, err = parseFacetArgs([]string{"bad"})
-	if err == nil {
-		t.Error("expected error")
-	}
-	_, err = parseFacetArgs([]string{"unknown=v"})
-	if err == nil {
-		t.Error("expected error")
-	}
-}
-
-func TestApplyFacetArgs_AutoPrefix(t *testing.T) {
-	var tmpl Template
-	applyFacetArgs(&tmpl, map[string]string{"persona": "engineer"})
-	if tmpl.Persona != "@engineer" {
-		t.Errorf("expected @engineer, got %q", tmpl.Persona)
-	}
-
-	tmpl = Template{}
-	applyFacetArgs(&tmpl, map[string]string{"persona": "@engineer"})
-	if tmpl.Persona != "@engineer" {
-		t.Errorf("expected @engineer, got %q", tmpl.Persona)
-	}
-}
