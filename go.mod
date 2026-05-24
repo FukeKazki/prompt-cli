@@ -1,4 +1,4 @@
-module github.com/kazki/prompt-cli
+module github.com/FukeKazki/prompt-cli
 
 go 1.26.3
 

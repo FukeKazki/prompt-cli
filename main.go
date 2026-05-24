@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kazki/prompt-cli/internal/tui"
+	"github.com/FukeKazki/prompt-cli/internal/tui"
 	"gopkg.in/yaml.v3"
 )
 
